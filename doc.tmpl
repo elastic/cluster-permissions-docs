@@ -1,0 +1,40 @@
+| API Groups  | Resources | Non Resource URLs | Resource Names | Verbs | Comment |
+| ----------- | --------- | ----- | -------------- | ----------------- | ------- |
+{{- range $i, $rule := . }}
+|
+{{- if $rule.APIGroups -}}
+{{- $length := len $rule.APIGroups }} {{ if eq $length 1 -}}
+    {{ (index $rule.APIGroups 0) }}
+{{- else -}}
+<ul>
+{{- range $i, $apiGroup := $rule.APIGroup -}}
+     <li>{{ $apiGroup }}</li>
+ {{- end -}}
+</ul>
+{{- end -}}
+{{- end -}}|<ul>
+{{- range $i, $resource := $rule.Resources -}}
+    <li>{{ $resource }}</li>
+{{- end -}}</ul>|
+{{- if not $rule.ResourceNames -}}
+none
+{{- else -}}
+<ul>
+{{- range $i, $resourceName := $rule.ResourceNames -}}
+     <li>{{ $resourceName }}</li>
+ {{- end -}}
+</ul>
+{{end -}}|
+{{- if not $rule.NonResourceURLs -}}
+none
+{{- else -}}
+<ul>
+{{- range $i, $nrl := $rule.NonResourceURLs -}}
+     <li>{{ $nrl }}</li>
+ {{- end -}}
+</ul>
+{{end -}}|<ul>
+ {{- range $i, $verb := $rule.Verbs -}}
+      <li>{{ $verb }}</li>
+  {{- end -}}</ul>|{{- $rule.Comment -}}|
+{{- end }}
