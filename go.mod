@@ -1,4 +1,4 @@
-module github.com/elastic/cluster-permissions-doc-generator
+module github.com/elastic/cluster-permissions-docs
 
 go 1.23.1
 
