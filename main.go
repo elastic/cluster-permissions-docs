@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"errors"
 	"flag"
@@ -25,18 +26,23 @@ import (
 	"gopkg.in/yaml.v3"
 	"html/template"
 	"os"
+	"sort"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 //go:embed doc.tmpl
 var docTemplate string
 
+const (
+	StartMarker = "<!--- START CLUSTER ROLES DOCUMENTATION --->"
+	EndMarker   = "<!--- END CLUSTER ROLES DOCUMENTATION --->"
+)
+
 func main() {
 
-	var clusterRoleFile string
-	flag.StringVar(&clusterRoleFile, "file", "", "path to a file which contains a ClusterRole rules. Only one ClusterRole is supported.")
+	var clusterRoleFile, out string
+	flag.StringVar(&clusterRoleFile, "in", "", "path to a file which contains a ClusterRole rules. Only one ClusterRole is supported.")
+	flag.StringVar(&out, "out", "", "path to a file were the content should be written")
 	flag.Parse()
 
 	if clusterRoleFile == "" {
@@ -101,14 +107,44 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := tmpl.Execute(os.Stdout, documentedRules); err != nil {
+
+	// If out is not nil:
+	// 1. Check if output file exist
+	// 2. If not, create it with the marker
+	// 3. If it does exist, read until the marker
+	// 3.1 If not marker found append content to the end of file
+	// 4. Write the output
+	// 5. Skip content until end marker
+
+	buff := new(bytes.Buffer)
+	if err := tmpl.Execute(buff, documentedRules); err != nil {
+		panic(err)
+	}
+
+	if out == "" {
+		fmt.Println(out)
+		return
+	}
+
+	// Check if file does exist.
+	if _, err := os.Stat(out); errors.Is(err, os.ErrNotExist) {
+		// No, let's just create it.
+		if err := os.WriteFile(out, buff.Bytes(), 0644); err != nil {
+			panic(err)
+		}
+		return
+	}
+
+	// Yes, insert or append the content.
+	updatedContent := updateMarkers(out, StartMarker, EndMarker, buff.Bytes())
+	if err := os.WriteFile(out, updatedContent, 0644); err != nil {
 		panic(err)
 	}
 }
 
 // getSubNodesFor attempts to find the Yaml node with the provided name and returns its value if found.
 func getSubNodesFor(nodes []*yaml.Node, nodeName string) ([]string, error) {
-	apiGroups := sets.New[string]()
+	apiGroups := make(map[string]struct{})
 	for i, node := range nodes {
 		if node.Value != nodeName {
 			continue
@@ -119,11 +155,20 @@ func getSubNodesFor(nodes []*yaml.Node, nodeName string) ([]string, error) {
 			if len(apiGroup.Value) == 0 {
 				continue
 			}
-			apiGroups.Insert(apiGroup.Value)
+			apiGroups[apiGroup.Value] = struct{}{}
 		}
-		return sets.List(apiGroups), nil
+		return toList(apiGroups), nil
 	}
 	return nil, fmt.Errorf("node %s not found", nodeName)
+}
+
+func toList(m map[string]struct{}) []string {
+	result := make([]string, 0, len(m))
+	for k := range m {
+		result = append(result, k)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func flattenComment(comment string) template.HTML {
