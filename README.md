@@ -5,9 +5,11 @@ This is a very primitive, one-shot, project to convert a file that contains `Clu
 ## Usage
 
 ```
-Usage of cluster_permissions_doc_generator:
-  -file string
+Usage of ./cluster-permissions-doc-generator:
+  -in string
         path to a file which contains a ClusterRole rules. Only one ClusterRole is supported.
+  -out string
+        path to a file were the content should be written
 ```
 
 ## YAML Comments
@@ -38,9 +40,11 @@ rules:
 This would be converted into the following:
 
 ```markdown
+<!--- START CLUSTER ROLES DOCUMENTATION --->
 | API Groups  | Resources | Non Resource URLs | Resource Names | Verbs | Comment |
 | ----------- | --------- | ----- | -------------- | ----------------- | ------- |
 ||<ul><li>endpoints</li><li>namespaces</li><li>nodes</li></ul>|none|none|<ul><li>get</li><li>list</li><li>watch</li></ul>|<ul><li>`Namespaces` are watched because...</li> <li>`Nodes` are watched because...</li> <li>`Endpoints` are watched because...</li></ul>|
+<!--- END CLUSTER ROLES DOCUMENTATION --->
 ```
 
 And this would be displayed as:
@@ -49,10 +53,13 @@ And this would be displayed as:
 | ----------- | --------- | ----- | -------------- | ----------------- | ------- |
 ||<ul><li>endpoints</li><li>namespaces</li><li>nodes</li></ul>|none|none|<ul><li>get</li><li>list</li><li>watch</li></ul>|<ul><li>`Namespaces` are watched because...</li> <li>`Nodes` are watched because...</li> <li>`Endpoints` are watched because...</li></ul>|
 
+If an output file is set using `-out` then the content is either:
+* Added to the end of the file
+* Updated between the markers `<!--- START CLUSTER ROLES DOCUMENTATION --->` and `<!--- END CLUSTER ROLES DOCUMENTATION --->`
+
 ## Limitations
 
-It has several strong limitations:
+* Template is hardcoded.
 * Only one file can be provided.
 * File must contain only one cluster role.
-* Result is only generated to standard output.
 
