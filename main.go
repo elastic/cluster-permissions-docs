@@ -23,7 +23,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 	"html/template"
 	"os"
 	"sort"
@@ -38,6 +38,22 @@ const (
 	EndMarker   = "<!--- END CLUSTER ROLES DOCUMENTATION --->"
 )
 
+func createTableHeader(hasNonResourceURLS, hasResourceNames bool) string {
+	tableHeader := "| API Groups  | Resources |"
+	tableHeaderSeparator := "| ----------- | --------- |"
+	if hasNonResourceURLS {
+		tableHeader = tableHeader + " Non Resource URLs |"
+		tableHeaderSeparator = tableHeaderSeparator + " ----- |"
+	}
+	if hasResourceNames {
+		tableHeader = tableHeader + " Resource Names |"
+		tableHeaderSeparator = tableHeaderSeparator + " -------------- |"
+	}
+	tableHeader = tableHeader + " Verbs | Comment |"
+	tableHeaderSeparator = tableHeaderSeparator + " ----------------- | ----------------- |"
+	return tableHeader + "\n" + tableHeaderSeparator
+}
+
 func main() {
 
 	var clusterRoleFile, out string
@@ -51,7 +67,7 @@ func main() {
 
 	rbac, err := os.ReadFile(clusterRoleFile)
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	var node yaml.Node
@@ -70,7 +86,7 @@ func main() {
 		}
 	}
 
-	documentedRules := make([]DocumentedRule, 0, len(rules.Content))
+	documentedRuleList := make([]DocumentedRule, 0, len(rules.Content))
 	// Process each rule
 	for _, rule := range rules.Content {
 		newRule := DocumentedRule{
@@ -100,7 +116,7 @@ func main() {
 		resourceNames, _ := getSubNodesFor(rule.Content, "resourceNames")
 		newRule.ResourceNames = resourceNames
 
-		documentedRules = append(documentedRules, newRule)
+		documentedRuleList = append(documentedRuleList, newRule)
 	}
 
 	tmpl, err := template.New("docTemplate").Parse(docTemplate)
@@ -116,13 +132,14 @@ func main() {
 	// 4. Write the output
 	// 5. Skip content until end marker
 
+	documentedRules := NewDocumentedRules(documentedRuleList)
 	buff := new(bytes.Buffer)
 	if err := tmpl.Execute(buff, documentedRules); err != nil {
 		panic(err)
 	}
 
 	if out == "" {
-		fmt.Println(out)
+		fmt.Println(string(buff.Bytes()))
 		return
 	}
 
@@ -176,6 +193,47 @@ func flattenComment(comment string) template.HTML {
 	result = strings.ReplaceAll(result, "\n", "")
 	return template.HTML(strings.Join(strings.Fields(result), " "))
 
+}
+
+func NewDocumentedRules(documentedRules DocumentedRuleList) DocumentedRules {
+	return DocumentedRules{
+		TableHeader: createTableHeader(
+			documentedRules.HasResourceNames(),
+			documentedRules.HasNonResourceURLs(),
+		),
+		DocumentedRules: documentedRules,
+	}
+}
+
+type DocumentedRules struct {
+	TableHeader     string
+	DocumentedRules []DocumentedRule
+}
+
+type DocumentedRuleList []DocumentedRule
+
+func (dl *DocumentedRuleList) HasResourceNames() bool {
+	if dl == nil {
+		return false
+	}
+	for _, rule := range *dl {
+		if len(rule.ResourceNames) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (dl *DocumentedRuleList) HasNonResourceURLs() bool {
+	if dl == nil {
+		return false
+	}
+	for _, rule := range *dl {
+		if len(rule.NonResourceURLs) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 type DocumentedRule struct {
